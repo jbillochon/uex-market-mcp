@@ -1,0 +1,29 @@
+# Public MCP server for UEX marketplace search (uex.cavalera.news).
+[Unit]
+Description=uex-market-mcp (Streamable HTTP, 127.0.0.1:8792)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+Environment=UEX_MCP_ALLOWED_HOSTS=uex.cavalera.news
+Environment=UEX_MARKET_CACHE=/opt/uex-mcp/cache
+Environment=UEX_MAX_CALLS_PER_MIN=40
+ExecStart=/opt/uex-mcp/venv/bin/uex-market-mcp --http --host 127.0.0.1 --port 8792
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/uex-mcp/cache
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

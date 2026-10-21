@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "uex-market-mcp"
+version = "0.2.0"
+description = "MCP server to search the UEX player marketplace of Star Citizen with combined filters (item, quality, age, price, location)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Julien Billochon (z0rglub)" }]
+keywords = ["mcp", "star-citizen", "uex", "marketplace", "claude"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Games/Entertainment",
+]
+dependencies = ["mcp>=2.3,<3"]
+
+[project.urls]
+Homepage = "https://github.com/jbillochon/uex-market-mcp"
+Issues = "https://github.com/jbillochon/uex-market-mcp/issues"
+
+[project.scripts]
+uex-market-mcp = "uex_market.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/uex_market"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "skill", "deploy", "README.md", "LICENSE"]
