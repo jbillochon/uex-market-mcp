@@ -151,8 +151,16 @@ def main(argv=None):
                    help="public Host header accepted behind a proxy (repeatable); "
                         "env UEX_MCP_ALLOWED_HOSTS, comma separated")
     p.add_argument("--cache-dir", default=os.environ.get("UEX_MARKET_CACHE") or default_cache_dir())
+    p.add_argument("--oauth-shim", action="store_true",
+                   default=os.environ.get("UEX_MCP_OAUTH_SHIM", "") in ("1", "true", "yes"),
+                   help="answer OAuth discovery/registration with an auto-approving "
+                        "facade (for claude.ai custom connectors); needs --public-url")
+    p.add_argument("--public-url", default=os.environ.get("UEX_MCP_PUBLIC_URL"),
+                   help="public base URL, e.g. https://uex.example.org")
     p.add_argument("--version", action="version", version=__version__)
     args = p.parse_args(argv)
+    if args.oauth_shim and not args.public_url:
+        p.error("--oauth-shim needs --public-url (or UEX_MCP_PUBLIC_URL)")
 
     # stdout belongs to the protocol in stdio mode: log to stderr only.
     logging.basicConfig(stream=sys.stderr, level=os.environ.get("UEX_LOG_LEVEL", "INFO"),
@@ -163,6 +171,12 @@ def main(argv=None):
     if not args.http:
         mcp.run("stdio")
         return
+    if args.oauth_shim:
+        from . import oauth_shim
+        redirect_hosts = [h for h in os.environ.get("UEX_MCP_OAUTH_REDIRECT_HOSTS", "").split(",")
+                          if h.strip()] or oauth_shim.DEFAULT_REDIRECT_HOSTS
+        oauth_shim.install(mcp, args.public_url, args.path, redirect_hosts)
+        log.info("OAuth shim enabled for %s", args.public_url)
     hosts = args.allowed_host or [h.strip() for h in
                                   os.environ.get("UEX_MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
     security = TransportSecuritySettings(

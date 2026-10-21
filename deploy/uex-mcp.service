@@ -10,6 +10,9 @@ Group=ubuntu
 Environment=UEX_MCP_ALLOWED_HOSTS=uex.cavalera.news
 Environment=UEX_MARKET_CACHE=/opt/uex-mcp/cache
 Environment=UEX_MAX_CALLS_PER_MIN=40
+# claude.ai custom connectors insist on OAuth: auto-approving facade, see oauth_shim.py
+Environment=UEX_MCP_OAUTH_SHIM=1
+Environment=UEX_MCP_PUBLIC_URL=https://uex.cavalera.news
 ExecStart=/opt/uex-mcp/venv/bin/uex-market-mcp --http --host 127.0.0.1 --port 8792
 Restart=on-failure
 RestartSec=5

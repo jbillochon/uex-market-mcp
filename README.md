@@ -93,6 +93,18 @@ example with rate limiting.
 | `UEX_MARKET_CACHE` | `~/.cache/uex-market` | catalog cache |
 | `UEX_MAX_CALLS_PER_MIN` | `40` | outgoing UEX budget |
 | `UEX_TOKEN` | | optional UEX token, for a quota of your own |
+| `UEX_MCP_OAUTH_SHIM` | off | `1`: auto-approving OAuth facade (see below) |
+| `UEX_MCP_PUBLIC_URL` | | public base URL, required by the OAuth facade |
+| `UEX_MCP_OAUTH_REDIRECT_HOSTS` | `claude.ai,claude.com,localhost,127.0.0.1` | redirect hosts accepted by the facade |
+
+**claude.ai and OAuth.** claude.ai custom connectors run OAuth discovery and
+dynamic client registration on "Connect" even for servers without
+authentication, and fail when there is no registration endpoint
+([anthropics/claude-ai-mcp#457](https://github.com/anthropics/claude-ai-mcp/issues/457)).
+`UEX_MCP_OAUTH_SHIM=1` answers that flow with an auto-approving facade: any
+client registers, `/authorize` redirects straight back, `/token` issues a
+token that grants nothing more, since `/mcp` stays open to everyone. Redirect
+URIs are restricted to an allowlist so `/authorize` is not an open redirector.
 
 ## Development
 
