@@ -64,9 +64,10 @@ Map every criterion the user gives; combine them in one call.
 
 ## Setup
 
-- Claude (web, desktop, mobile): Settings > Connectors > Add custom
+- Claude (web or desktop): Customize > Connectors > + Add > Add custom
   connector, URL `https://uex.cavalera.news/mcp` (public, read only, no
-  account) or the URL of your own instance.
+  account) or the URL of your own instance. In a chat, switch it on with
+  + > Connectors. Skills and instructions: https://cavalera.news/claude
 - Claude Code: `claude mcp add --transport http uex-market https://uex.cavalera.news/mcp`
 - Fully local, no third-party server: `uvx --from git+https://github.com/jbillochon/uex-market-mcp uex-market-mcp`
   as a stdio MCP server (Claude Desktop config or `claude mcp add uex-market -- uvx --from git+https://github.com/jbillochon/uex-market-mcp uex-market-mcp`).
