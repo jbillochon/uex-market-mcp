@@ -25,6 +25,7 @@ Map every criterion the user gives; combine them in one call.
 | "cheapest", "best price" | `sort="price"` |
 | "newest first" | `sort="recent"` |
 | "best", "highest quality" (default) | `sort="quality"` |
+| "active sellers", "who is still playing", "sellers likely to answer" | `sort="seller_activity"` |
 | "who wants to buy", "I want to sell my..." | `operation="buy"` |
 | "in Pyro", "in Stanton" | `system` |
 | "at Area18", "near Orison" | `location` (substring) |
@@ -56,6 +57,10 @@ Map every criterion the user gives; combine them in one call.
 - Prices: quote price and `unit` together as given (scu, box, unit...).
   Sellers enter them freely and some put the whole lot price: never convert
   or compare across units without saying so.
+- With `sort="seller_activity"`, each result carries `seller_activity`
+  (latest listing posted on UEX by that seller, any item; away from game;
+  RSI verified; availability). UEX has no last-login date: say "last posted
+  a listing N days ago", never "last online".
 - Mention when one listing per seller was kept (`hidden_duplicate_sellers`)
   if the user asked for "all".
 - End with a short reminder: trades are between players, outside any

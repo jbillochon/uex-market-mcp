@@ -74,3 +74,19 @@ class FakeApi:
         if id_item:
             return BY_ITEM.get((id_item, operation), [])
         return LATEST.get(operation, [])
+
+    USERS = dict(alice=dict(is_away_game=0, date_rsi_verified=1, time_availability="evening",
+                            timezone="Europe/Paris"),
+                 bob=dict(is_away_game=1, date_rsi_verified=0),
+                 carol=dict(is_away_game=0, date_rsi_verified=1))
+    BY_USER = dict(carol=[listing(50, 1, "Other item", None, "carol", 0.1)],
+                   alice=[listing(51, 1, "Other item", None, "alice", 6)])
+
+    def user(self, username):
+        self.calls.append(("user", username))
+        return self.USERS.get(username.lower(), dict())
+
+    def listings_by_user(self, username):
+        self.calls.append(("by_user", username))
+        rows = [r for rows in BY_ITEM.values() for r in rows if r["user_username"] == username]
+        return rows + self.BY_USER.get(username.lower(), [])

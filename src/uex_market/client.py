@@ -124,3 +124,14 @@ def star_systems():
 
 def commodities():
     return get("commodities")
+
+
+def user(username):
+    """Public UEX profile: is_away_game, date_rsi_verified, time_availability,
+    timezone, date_modified (last profile edit, not last login)."""
+    return get("user", dict([("username", username)]))
+
+
+def listings_by_user(username):
+    """Every listing of one seller (all items)."""
+    return get("marketplace_listings", dict([("username", username)]))

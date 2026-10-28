@@ -41,6 +41,9 @@ player-to-player listings of commodities, ores, armor, weapons, components.
   with several qualities, '?' is unknown. Say so when it matters.
 - Results keep one listing per seller by default, and only active ones
   (not sold out, not expired).
+- sort='seller_activity' ranks by how recently each seller posted a listing
+  on UEX (sellers marked away from the game last). UEX has no last-login
+  date: say "last posted a listing N days ago", not "last online".
 - Prices are as entered by the seller, for the listing's `unit` (scu, box,
   unit...); some sellers enter the whole lot price. Quote price and unit
   together, never convert.
@@ -92,8 +95,10 @@ def build_server(market=None, cache_dir=None):
         category: Annotated[str | None, Field(description=(
             "UEX category or section, e.g. 'Commodities', 'Helmets', 'Armor', "
             "'Personal Weapons', 'Quantum Drives'."))] = None,
-        sort: Annotated[Literal["quality", "recent", "price"], Field(description=(
-            "quality: best first; recent: newest first; price: cheapest first."))] = "quality",
+        sort: Annotated[Literal["quality", "recent", "price", "seller_activity"], Field(description=(
+            "quality: best first; recent: newest first; price: cheapest first; "
+            "seller_activity: sellers who posted on UEX most recently first, sellers "
+            "marked away from the game last (adds a seller_activity block per result)."))] = "quality",
         one_per_seller: Annotated[bool, Field(description=(
             "Keep only each seller's best listing (default), otherwise one "
             "prolific seller fills the whole list."))] = True,

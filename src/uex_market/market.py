@@ -30,6 +30,10 @@ SYSTEMS_TTL = 86400
 WINDOW_DAYS = 21
 MAX_ITEMS_PER_SEARCH = 6
 MAX_LIMIT = 50
+SELLER_TTL = 6 * 3600
+SELLER_LOOKUPS = 15       # profils de vendeurs consultes au plus par recherche
+BUDGET_RESERVE = 8        # appels UEX laisses aux autres recherches
+SORTS = ("quality", "recent", "price", "seller_activity")
 
 Q_SOURCES = dict(
     declared="quality field set by the seller",
@@ -71,6 +75,7 @@ class Market:
         self._window = dict()     # listing id -> row
         self._latest_at = 0
         self._systems = (0, dict())
+        self._sellers = dict()    # pseudo en minuscules -> (fetched_at, info)
         self.started_at = time.time()
 
     # Sources -------------------------------------------------------------
@@ -126,6 +131,90 @@ class Market:
                     self._window.pop(lid, None)
                 self._latest_at = now
         return list(self._window.values()), self._latest_at
+
+    # Sellers -------------------------------------------------------------
+
+    def _known_last_listing(self):
+        """Derniere annonce connue en memoire par vendeur (gratuit)."""
+        last = dict()
+        rows = list(self._window.values())
+        for _, part in list(self._items.values()):
+            rows += part
+        for r in rows:
+            who = (r.get("seller") or "").lower()
+            if who and (r.get("date_added") or 0) > last.get(who, 0):
+                last[who] = r.get("date_added") or 0
+        return last
+
+    def seller_info(self, username, allow_fetch=True):
+        """Signaux d'activite d'un vendeur, caches quelques heures. UEX ne
+        publie pas de date de derniere connexion : on prend la date de sa
+        derniere annonce publiee (tous objets confondus), son indicateur
+        'absent du jeu' et sa verification RSI."""
+        key = (username or "").lower()
+        if not key:
+            return None
+        hit = self._sellers.get(key)
+        if hit and time.time() - hit[0] < SELLER_TTL:
+            return hit[1]
+        if not allow_fetch:
+            return None
+        bud = getattr(self.api, "BUDGET", None)
+        if bud is not None and bud.used() > bud.per_minute - BUDGET_RESERVE:
+            return None
+        try:
+            prof = self.api.user(username) or dict()
+            mine = self.api.listings_by_user(username) or []
+        except Exception as exc:     # UexError, reseau : pas de signal
+            log.warning("seller %s unavailable: %s", username, exc)
+            return None
+        if isinstance(prof, list):
+            prof = prof[0] if prof else dict()
+        now = time.time()
+        active = [r for r in mine if is_active(dict(is_sold_out=int(r.get("is_sold_out") or 0),
+                                                    date_expiration=int(r.get("date_expiration") or 0)), now)]
+        dates = [int(r.get("date_added") or 0) for r in mine if r.get("date_added")]
+        info = dict(
+            last_listing_at=max(dates) if dates else None,
+            active_listings=len(active),
+            away_from_game=bool(int(prof.get("is_away_game") or 0)),
+            rsi_verified=bool(int(prof.get("date_rsi_verified") or 0)),
+            availability=prof.get("time_availability") or None,
+            timezone=prof.get("timezone") or None,
+            profile_updated_at=int(prof.get("date_modified") or 0) or None,
+        )
+        with self._lock:
+            self._sellers[key] = (now, info)
+            if len(self._sellers) > 5000:
+                for k, _ in sorted(self._sellers.items(), key=lambda kv: kv[1][0])[:1000]:
+                    self._sellers.pop(k, None)
+        return info
+
+    def _by_seller_activity(self, results, limit):
+        """Classe les annonces par activite recente du vendeur. 1. tri sur la
+        derniere annonce connue en memoire ; 2. pour les premiers vendeurs,
+        profil et annonces UEX (date exacte, absent du jeu) ; vendeurs absents
+        du jeu en dernier."""
+        known = self._known_last_listing()
+        q = lambda r: (r.get("q_max") if r.get("q_multi") else r.get("q_eff")) or -1
+        results.sort(key=lambda r: (-known.get((r.get("seller") or "").lower(), r.get("date_added") or 0),
+                                    -q(r)))
+        head = results[:limit + 5]
+        fetched = 0
+        for r in head:
+            info = self.seller_info(r.get("seller"), allow_fetch=False)
+            if info is None and fetched < SELLER_LOOKUPS:
+                info = self.seller_info(r.get("seller"))
+                fetched += 1
+            r["_seller"] = info
+
+        def key(r):
+            info = r.get("_seller") or dict()
+            last = info.get("last_listing_at") or known.get((r.get("seller") or "").lower(),
+                                                            r.get("date_added") or 0)
+            return (bool(info.get("away_from_game")), -last, -q(r))
+        head.sort(key=key)
+        return head[:limit], sum(1 for r in head[:limit] if r.get("_seller"))
 
     # Search --------------------------------------------------------------
 
@@ -192,12 +281,16 @@ class Market:
             needles = fold(text).split()
             rows = [r for r in rows if all(n in fold(r.get("title")) for n in needles)]
 
+        by_activity = sort == "seller_activity"
         results, stats = search(
             rows, operation=operation, quality_min=quality_min, quality_max=quality_max,
             max_age_days=max_age_days or None, price_max=price_max, system=system,
             location=location, seller=seller, include_unknown=include_unknown_quality,
             sort=sort if sort in ("quality", "recent", "price") else "quality",
-            dedupe_seller=one_per_seller, limit=limit)
+            dedupe_seller=one_per_seller, limit=None if by_activity else limit)
+        enriched = None
+        if by_activity:
+            results, enriched = self._by_seller_activity(results, limit)
 
         out = dict(
             status="ok",
@@ -214,6 +307,11 @@ class Market:
             data=dict(source="UEX public API (uexcorp.space), live with short caches",
                       **sources),
         )
+        if by_activity:
+            out["seller_activity_note"] = (
+                "UEX publishes no last-login date. Sellers are ranked by their latest listing "
+                "posted on UEX (any item), sellers marked away from the game last; checked "
+                "for %d of %d results." % (enriched or 0, len(results)))
         if not results:
             out["hint"] = ("No listing matches every filter. Widen max_age_days, "
                            "lower quality_min, or drop location/system filters.")
@@ -241,6 +339,22 @@ class Market:
             posted_days_ago=age_days(r),
             expires=_iso(r.get("date_expiration")),
             url=r.get("url"),
+            seller_activity=self._present_seller(r.get("_seller")),
+        ))
+
+    @staticmethod
+    def _present_seller(info):
+        if not info:
+            return None
+        last = info.get("last_listing_at")
+        return _compact(dict(
+            last_listing=_iso(last),
+            last_listing_days_ago=max(0, int((time.time() - last) // DAY)) if last else None,
+            active_listings=info.get("active_listings"),
+            away_from_game=info.get("away_from_game") or None,
+            rsi_verified=info.get("rsi_verified"),
+            availability=info.get("availability"),
+            timezone=info.get("timezone"),
         ))
 
     def find_items(self, query, category=None, limit=10):

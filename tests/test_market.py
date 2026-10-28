@@ -142,3 +142,27 @@ class SearchTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SellerActivityTest(unittest.TestCase):
+    def test_rank_by_seller_activity(self):
+        m, api = market()
+        r = m.search(item="Stileron", sort="seller_activity", limit=5)
+        sellers = [x["seller"] for x in r["results"]]
+        # carol a publie il y a 2 h ; bob est absent du jeu : dernier
+        self.assertEqual(sellers[0], "carol")
+        self.assertEqual(sellers[-1], "bob")
+        top = r["results"][0]["seller_activity"]
+        self.assertEqual(top["last_listing_days_ago"], 0)
+        self.assertTrue(top["rsi_verified"])
+        self.assertTrue([x for x in r["results"] if x["seller"] == "bob"][0]["seller_activity"]["away_from_game"])
+        self.assertIn("no last-login", r["seller_activity_note"])
+        n = sum(1 for c in api.calls if c[0] == "user")
+        m.search(item="Stileron", sort="seller_activity", limit=5)      # cache
+        self.assertEqual(sum(1 for c in api.calls if c[0] == "user"), n)
+
+    def test_other_sorts_unchanged(self):
+        m, api = market()
+        r = m.search(item="Stileron", sort="quality", limit=5)
+        self.assertNotIn("seller_activity", r["results"][0])
+        self.assertFalse([c for c in api.calls if c[0] == "user"])
